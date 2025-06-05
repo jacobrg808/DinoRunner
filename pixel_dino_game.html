@@ -412,7 +412,6 @@
             }
         }
 
-        /* Achievement and Character Customization Styles */
         .achievement-popup {
             position: fixed;
             top: 20px;
@@ -498,6 +497,9 @@
             height: 32px;
             margin: 5px auto;
             image-rendering: pixelated;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
         }
 
         .character-grid {
@@ -891,7 +893,6 @@
         <div id="character-select">
             <h3>Select Character</h3>
             <div class="character-grid">
-                <!-- Characters will be populated by JavaScript -->
             </div>
         </div>
         <button id="start-game" style="display: none;">Select a character to start!</button>
@@ -939,7 +940,6 @@
             <span class="modal-close">×</span>
             <h2>Achievements</h2>
             <div id="achievements-list" class="achievement-list">
-                <!-- Achievements will be populated by JavaScript -->
             </div>
         </div>
     </div>
@@ -949,7 +949,6 @@
             <span class="modal-close">×</span>
             <h2>Leaderboard</h2>
             <div id="modal-leaderboard-list" class="score-list">
-                <!-- Leaderboard will be populated by JavaScript -->
             </div>
         </div>
     </div>
@@ -961,7 +960,6 @@
         <p class="character-hint">Check the character select screen</p>
     </div>
 
-    <!-- Insert (or re-insert) the achievement popup div (if missing) inside the body, for example after the milestone popup -->
     <div id="achievement-popup" class="achievement-popup">
         <h3>Achievement Unlocked!</h3>
         <p class="achievement-name"></p>
@@ -969,7 +967,6 @@
     </div>
 
     <script>
-        // Get DOM Elements
         const dino = document.getElementById('dino');
         const obstacle = document.getElementById('obstacle');
         const gameArea = document.getElementById('game-area');
@@ -981,27 +978,19 @@
         const backToMenuBtn = document.getElementById('back-to-menu');
         const milestonePopup = document.getElementById('milestone-popup');
 
-        const jumpSound = document.getElementById('jumpSound');
-        const milestoneSound = document.getElementById('milestoneSound');
-        const gameOverSound = document.getElementById('gameOverSound');
-
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
         function generateJumpSound() {
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
-            
             oscillator.type = 'sine';
             oscillator.frequency.setValueAtTime(660, audioContext.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(220, audioContext.currentTime + 0.2);
-            
             gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
             gainNode.gain.linearRampToValueAtTime(0.25, audioContext.currentTime + 0.05);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-            
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
-            
             oscillator.start();
             oscillator.stop(audioContext.currentTime + 0.2);
         }
@@ -1009,20 +998,16 @@
         function generateMilestoneSound() {
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
-            
             oscillator.type = 'square';
             oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
             oscillator.frequency.setValueAtTime(880, audioContext.currentTime + 0.1);
             oscillator.frequency.setValueAtTime(1320, audioContext.currentTime + 0.2);
-            
             gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
             gainNode.gain.setValueAtTime(0.2, audioContext.currentTime + 0.1);
             gainNode.gain.setValueAtTime(0.2, audioContext.currentTime + 0.2);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-            
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
-            
             oscillator.start();
             oscillator.stop(audioContext.currentTime + 0.3);
         }
@@ -1030,32 +1015,30 @@
         function generateGameOverSound() {
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
-            
             oscillator.type = 'sawtooth';
             oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(55, audioContext.currentTime + 0.5);
-            
             gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-            
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
-            
             oscillator.start();
             oscillator.stop(audioContext.currentTime + 0.5);
         }
 
-        // Game State Variables
         let isJumping = false;
         let isGameOver = false;
         let isInGame = false;
         let score = 0;
-        let gameLogicInterval;
-        let scoreInterval;
         let lastMilestone = 0;
         let jumpCount = 0;
 
-        // Milestone Messages
+        let gameLoopId = null;
+        let lastTimestamp = 0;
+        let scoreUpdateAccumulator = 0;
+        const SCORE_INTERVAL_MS = 100;
+
+
         const milestoneMessages = {
             100: "You're getting started!",
             200: "You're on fire!",
@@ -1069,11 +1052,9 @@
             1000: "You're a true champion!"
         };
 
-        // Leaderboard System
         let highScore = 0;
-        let leaderboard = []; // Array to store top scores
+        let leaderboard = []; 
 
-        // Obstacle Definitions
         const obstacleTypes = [
             {
                 name: "cactus_small_single",
@@ -1127,10 +1108,9 @@
         function jump() {
             if (isJumping || isGameOver) return;
             isJumping = true;
-            jumpCount++; // Increment jump counter for achievement
+            jumpCount++; 
             
-            // Check for jump master achievement
-            if (jumpCount === 50) {
+            if (jumpCount === 50 && !achievements['jump_master'].unlocked) {
                 unlockAchievement('jump_master');
             }
             
@@ -1144,18 +1124,13 @@
 
         document.addEventListener('keydown', function(event) {
             if (event.code === 'Space') {
-                event.preventDefault(); // Prevent page scroll
+                event.preventDefault(); 
                 
                 if (isGameOver) {
-                    // If game is over, restart using startGame
-                    console.log('Restarting game...');
                     startGame();
                 } else if (isInGame) {
-                    // If we're in the game, handle jump
-                    console.log('Jumping...');
                     jump();
                 }
-                // No handling for title screen - must use the start button
             }
         });
 
@@ -1164,7 +1139,6 @@
         });
 
         function showTitleScreen() {
-            console.log('Showing title screen...');
             const titleScreen = document.getElementById('title-screen');
             const gameContainer = document.getElementById('game-container');
             
@@ -1175,8 +1149,12 @@
             if (gameContainer) {
                 gameContainer.style.display = 'none';
             }
+            isInGame = false;
+            if (gameLoopId) {
+                cancelAnimationFrame(gameLoopId);
+                gameLoopId = null;
+            }
 
-            // Update leaderboard display after ensuring DOM is ready
             requestAnimationFrame(() => {
                 updateLeaderboardDisplay();
             });
@@ -1193,14 +1171,9 @@
         }
 
         function updateLeaderboardDisplay() {
-            console.log('Updating leaderboard display...');
             const leaderboardElement = document.getElementById('leaderboard-list');
             const modalLeaderboardList = document.getElementById('modal-leaderboard-list');
             
-            console.log('Leaderboard element found:', leaderboardElement);
-            console.log('Modal leaderboard list found:', modalLeaderboardList);
-            
-            // Helper function to generate leaderboard HTML
             function generateLeaderboardHTML(scores) {
                 if (!scores || scores.length === 0) {
                     return '<div class="score-entry">No scores yet - be the first!</div>';
@@ -1221,16 +1194,13 @@
                     .join('');
             }
 
-            // Update main leaderboard if it exists
             if (leaderboardElement) {
                 leaderboardElement.innerHTML = generateLeaderboardHTML(leaderboard);
             }
 
-            // Update modal leaderboard if it exists
             if (modalLeaderboardList) {
                 modalLeaderboardList.innerHTML = generateLeaderboardHTML(leaderboard);
             }
-            // Update high score display on the title screen
             updateHighScoreDisplay();
         }
 
@@ -1248,10 +1218,7 @@
             const randomIndex = Math.floor(Math.random() * obstacleTypes.length);
             currentObstacleProps = obstacleTypes[randomIndex];
 
-            console.log("Spawning obstacle:", currentObstacleProps.name);
-
             if (!currentObstacleProps || typeof currentObstacleProps.width === 'undefined' || typeof currentObstacleProps.svg === 'undefined') {
-                console.error("Error: Invalid currentObstacleProps!", currentObstacleProps);
                 return;
             }
 
@@ -1270,8 +1237,6 @@
 
             obstacle.style.animation = 'obstacle-move 2s linear infinite';
             obstacle.style.animationPlayState = 'running';
-
-            console.log(`Obstacle spawned - Width: ${currentObstacleProps.width}px, Height: ${currentObstacleProps.height}px`);
         }
 
         function checkGameLogic() {
@@ -1322,44 +1287,54 @@
             }, 2000);
         }
 
-        function updateScore() {
+        function _incrementScoreAndUpdateDisplay() {
             score++;
-            scoreDisplay.textContent = score;
+            scoreDisplay.textContent = `Score: ${score}`;
+        }
+
+        function _checkAndUpdateHighScore() {
             if (score > highScore) {
                 highScore = score;
                 updateHighScoreDisplay();
             }
-            if (score === 100) {
-                unlockAchievement('score_100');
-                showAchievementPopup('score_100', 'Score 100', 'Reach a score of 100');
-            } else if (score === 500) {
-                unlockAchievement('score_500');
-                showAchievementPopup('score_500', 'Score 500', 'Reach a score of 500');
-            } else if (score === 1000) {
-                unlockAchievement('score_1000');
-                showAchievementPopup('score_1000', 'Score 1000', 'Reach a score of 1000');
-            } else if (jumpCount === 50) {
-                unlockAchievement('jump_master');
-                showAchievementPopup('jump_master', 'Jump Master', 'Jump 50 times');
-            }
+        }
 
+        function _checkScoreBasedAchievements() {
+            if (score === 100 && achievements['score_100'] && !achievements['score_100'].unlocked) {
+                unlockAchievement('score_100');
+            } else if (score === 500 && achievements['score_500'] && !achievements['score_500'].unlocked) {
+                unlockAchievement('score_500');
+            } else if (score === 1000 && achievements['score_1000'] && !achievements['score_1000'].unlocked) {
+                unlockAchievement('score_1000');
+            }
+        }
+        
+        function _checkMilestones() {
             if (score % 100 === 0 && score > lastMilestone && !isGameOver) {
                 lastMilestone = score;
                 showMilestonePopup(score);
             }
+        }
+        
+        function _updateDayNightCycle() {
             if (window.updateDayNightCycle) window.updateDayNightCycle(score);
         }
+
 
         function gameOver() {
             if (isGameOver) return;
             isGameOver = true;
-            clearInterval(gameLogicInterval);
-            clearInterval(scoreInterval);
+            isInGame = false; 
+
+            if (gameLoopId) {
+                cancelAnimationFrame(gameLoopId);
+                gameLoopId = null;
+            }
+
             if (obstacle) {
                 obstacle.style.animationPlayState = 'paused';
             }
             
-            // Check for first death achievement
             unlockAchievement('first_death');
             
             generateGameOverSound();
@@ -1394,45 +1369,62 @@
             gameOverlay.classList.add('show');
             backToMenuBtn.style.display = 'inline-block';
         }
+        
+        function gameLoop(timestamp) {
+            if (isGameOver || !isInGame) {
+                 if (gameLoopId) cancelAnimationFrame(gameLoopId);
+                 gameLoopId = null;
+                 return;
+            }
+
+            const deltaTime = timestamp - lastTimestamp;
+            lastTimestamp = timestamp;
+
+            checkGameLogic();
+
+            scoreUpdateAccumulator += deltaTime;
+            if (scoreUpdateAccumulator >= SCORE_INTERVAL_MS) {
+                _incrementScoreAndUpdateDisplay();
+                _checkAndUpdateHighScore();
+                _checkScoreBasedAchievements();
+                _checkMilestones();
+                _updateDayNightCycle();
+                scoreUpdateAccumulator -= SCORE_INTERVAL_MS; 
+            }
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+
 
         function startGame() {
-            // First show the game screen
             titleScreen.style.display = 'none';
             gameContainer.style.display = 'block';
             isInGame = true;
-
-            // Reset game state
             isGameOver = false;
             isJumping = false;
             score = 0;
-            jumpCount = 0; // Reset jump counter
+            jumpCount = 0; 
             lastMilestone = 0;
             scoreDisplay.textContent = `Score: ${score}`;
             backToMenuBtn.style.display = 'none';
             
-            // Reset UI elements
             document.getElementById('game-overlay').classList.remove('show');
             document.getElementById('milestone-popup').classList.remove('animate');
             
-            // Reset dino position and animation
             dino.classList.remove('jump');
             dino.style.bottom = '30px';
 
-            // Start game logic
             spawnNewObstacle(); 
 
-            // Clear any existing intervals
-            clearInterval(gameLogicInterval);
-            clearInterval(scoreInterval);
-            
-            // Start game loops
-            gameLogicInterval = setInterval(checkGameLogic, 10);
-            scoreInterval = setInterval(updateScore, 100);
+            if (gameLoopId) {
+                cancelAnimationFrame(gameLoopId);
+            }
+            lastTimestamp = performance.now();
+            scoreUpdateAccumulator = 0;
+            gameLoopId = requestAnimationFrame(gameLoop);
         }
 
         showTitleScreen();
 
-        // Character and Achievement Systems
         const characterTypes = {
             default: {
                 name: "Classic Dino",
@@ -1525,148 +1517,98 @@
         let unlockedAchievements = new Set();
 
         function unlockAchievement(achievementId) {
-            console.log('Attempting to unlock achievement:', achievementId);
             if (!achievements[achievementId] || achievements[achievementId].unlocked) {
-                console.log('Achievement already unlocked or invalid:', achievementId);
                 return;
             }
             achievements[achievementId].unlocked = true;
             unlockedAchievements.add(achievementId);
-            console.log('Achievement unlocked:', achievementId);
-            console.log('Current unlocked achievements:', Array.from(unlockedAchievements));
-            // Check for character unlocks
+            
             let aCharWasUnlocked = false;
             Object.entries(characterTypes).forEach(([charId, char]) => {
-                console.log(`Checking character ${charId}:`, { requirement: char.requirement, currentlyUnlocked: char.unlocked, score: score, unlockedAchievements: Object.values(achievements).filter(a => a.unlocked).length });
                 if (!char.unlocked && char.requirement) {
                     let shouldUnlock = false;
                     if (char.requirement.startsWith('score_')) {
                         const requiredScore = parseInt(char.requirement.split('_')[1]);
-                        console.log(`Checking score requirement for ${charId}:`, { required: requiredScore, current: score });
                         if (score >= requiredScore) { shouldUnlock = true; }
                     } else if (char.requirement.startsWith('achievement_')) {
                         const requiredCount = parseInt(char.requirement.split('_')[1]);
                         const unlockedCount = Object.values(achievements).filter(a => a.unlocked).length;
-                        console.log(`Checking achievement count for ${charId}:`, { required: requiredCount, current: unlockedCount });
                         if (unlockedCount >= requiredCount) { shouldUnlock = true; }
                     } else if (char.requirement === achievementId) { shouldUnlock = true; }
+                    
                     if (shouldUnlock) {
-                        console.log(`Unlocking character ${charId}`);
                         char.unlocked = true;
                         showCharacterUnlockPopup(charId);
                         aCharWasUnlocked = true;
                     }
                 }
             });
-            // If a character was unlocked, delay the achievement popup so that the character popup appears first.
+
+            const ach = achievements[achievementId];
             if (aCharWasUnlocked) {
-                setTimeout(() => { showAchievementPopup(achievementId); }, 3500);
+                setTimeout(() => { showAchievementPopup(achievementId, ach.name, ach.description); }, 3500);
             } else {
-                showAchievementPopup(achievementId);
+                showAchievementPopup(achievementId, ach.name, ach.description);
             }
             saveGameProgress();
-            // Update character grid to reflect new unlocks
             initializeCharacterSelect();
         }
 
-        function showAchievementPopup(achievementId) {
-            const achievement = achievements[achievementId];
-            const popup = document.createElement('div');
-            popup.className = 'achievement-popup';
-            popup.innerHTML = `
-                <div class="achievement-icon">${achievement.icon}</div>
-                <div class="achievement-content">
-                    <div class="achievement-name">${achievement.name}</div>
-                    <div class="achievement-description">${achievement.description}</div>
-                </div>
-            `;
-            document.body.appendChild(popup);
-            setTimeout(() => popup.remove(), 3000);
-        }
 
         function showCharacterUnlockPopup(characterId) {
             const character = characterTypes[characterId];
             const popup = document.getElementById('character-unlock-popup');
             const icon = popup.querySelector('.character-icon');
-            icon.style.backgroundImage = `url('${character.svg}')`;
+            icon.style.backgroundImage = `url('data:image/svg+xml,${encodeURIComponent(character.svg)}')`; 
+            popup.querySelector('.character-name').textContent = character.name;
             popup.classList.add('show');
 
-            // Auto-hide after 3 seconds
             setTimeout(() => {
                 popup.classList.remove('show');
             }, 3000);
         }
 
         function selectCharacter(characterId) {
-            console.log('Attempting to select character:', characterId);
-            console.log('Character state:', {
-                exists: !!characterTypes[characterId],
-                unlocked: characterTypes[characterId]?.unlocked,
-                currentCharacter: currentCharacter
-            });
-            
             if (!characterTypes[characterId]) {
-                console.log('Character does not exist:', characterId);
                 return;
             }
-            
             if (!characterTypes[characterId].unlocked) {
-                console.log('Character is locked:', characterId);
                 return;
             }
 
-            // Update visual selection
             document.querySelectorAll('.character-option').forEach(option => {
                 option.classList.remove('selected');
             });
             const selectedOption = document.querySelector(`.character-option[data-character-id="${characterId}"]`);
             if (selectedOption) {
                 selectedOption.classList.add('selected');
-                console.log('Updated visual selection for:', characterId);
-            } else {
-                console.log('Could not find character option element for:', characterId);
             }
 
-            // Update game state
             currentCharacter = characterId;
             const character = characterTypes[characterId];
             const svgDataUrl = 'data:image/svg+xml,' + encodeURIComponent(character.svg);
             const dino = document.getElementById('dino');
             if (dino) {
                 dino.style.backgroundImage = `url("${svgDataUrl}")`;
-                console.log('Updated dino sprite for:', characterId);
-            } else {
-                console.log('Could not find dino element');
             }
-
-            // Update start button
             updateStartButton();
-
-            // Save progress
             saveGameProgress();
-            console.log('Saved game progress after character selection');
         }
 
         function updateStartButton() {
-            console.log('Updating start button...');
             const startGameBtn = document.getElementById('start-game');
             if (startGameBtn) {
                 if (currentCharacter) {
                     startGameBtn.style.display = 'inline-block';
                     startGameBtn.disabled = false;
                     startGameBtn.textContent = 'Click to Start!';
-                    console.log('Start button enabled');
                 } else {
                     startGameBtn.style.display = 'none';
-                    console.log('Start button hidden');
                 }
-            } else {
-                console.log('Start button not found');
             }
         }
 
         function saveGameProgress() {
-            console.log('Saving game progress...');
             try {
                 const progress = {
                     currentCharacter: currentCharacter,
@@ -1680,30 +1622,26 @@
                     )
                 };
                 localStorage.setItem('dinoGameProgress', JSON.stringify(progress));
-                console.log('Game progress saved');
             } catch (error) {
-                console.error('Error saving game progress:', error);
+                // error saving
             }
         }
 
         function loadGameProgress() {
-            console.log('Loading game progress...');
             try {
                 const savedProgress = localStorage.getItem('dinoGameProgress');
                 if (savedProgress) {
                     const progress = JSON.parse(savedProgress);
-                    console.log('Loaded progress:', progress);
                     
-                    // Update achievements
                     if (progress.achievements) {
                         Object.entries(progress.achievements).forEach(([id, unlocked]) => {
                             if (achievements[id]) {
                                 achievements[id].unlocked = unlocked;
+                                if(unlocked) unlockedAchievements.add(id);
                             }
                         });
                     }
                     
-                    // Update current character
                     if (progress.currentCharacter && characterTypes[progress.currentCharacter]) {
                         currentCharacter = progress.currentCharacter;
                         const character = characterTypes[currentCharacter];
@@ -1714,18 +1652,15 @@
                         }
                     }
                     
-                    // Update leaderboard
                     if (progress.leaderboard) {
                         leaderboard = progress.leaderboard;
                     }
                     
-                    // Update high score
                     if (typeof progress.highScore !== 'undefined') {
                         highScore = progress.highScore;
                         updateHighScoreDisplay();
                     }
                     
-                    // Update character unlocks
                     if (progress.characters) {
                         Object.entries(progress.characters).forEach(([id, unlocked]) => {
                             if (characterTypes[id]) {
@@ -1733,34 +1668,22 @@
                             }
                         });
                     }
-                    
-                    console.log('Game progress loaded');
                 }
             } catch (error) {
-                console.error('Error loading game progress:', error);
+                // error loading
             }
         }
 
-        // Initialize achievements button with debug logging
         function initializeAchievements() {
-            console.log('Initializing achievements...');
             const achievementsBtn = document.getElementById('achievements-btn');
-            console.log('Achievements button found:', achievementsBtn);
-            
             if (achievementsBtn) {
-                // Remove any existing click handlers
                 achievementsBtn.replaceWith(achievementsBtn.cloneNode(true));
                 const newAchievementsBtn = document.getElementById('achievements-btn');
                 
                 newAchievementsBtn.addEventListener('click', function() {
-                    console.log('Achievements button clicked');
                     const modal = document.getElementById('achievements-modal');
                     const achievementsList = document.getElementById('achievements-list');
-                    console.log('Modal found:', modal);
-                    console.log('Achievements list found:', achievementsList);
-                    
                     if (modal && achievementsList) {
-                        // Update achievements list
                         const achievementsHTML = Object.values(achievements)
                             .map(achievement => `
                                 <div class="achievement-item ${achievement.unlocked ? 'unlocked' : ''}">
@@ -1774,86 +1697,51 @@
                         
                         achievementsList.innerHTML = achievementsHTML;
                         modal.style.display = 'block';
-                        console.log('Achievements modal displayed');
                     }
                 });
-                console.log('Achievements click handler attached');
             }
         }
 
-        // Initialize leaderboard button with debug logging
         function initializeLeaderboard() {
-            console.log('Initializing leaderboard...');
             const leaderboardBtn = document.getElementById('leaderboard-btn');
-            console.log('Leaderboard button found:', leaderboardBtn);
-            
             if (leaderboardBtn) {
-                // Remove any existing click handlers
                 leaderboardBtn.replaceWith(leaderboardBtn.cloneNode(true));
                 const newLeaderboardBtn = document.getElementById('leaderboard-btn');
                 
                 newLeaderboardBtn.addEventListener('click', function() {
-                    console.log('Leaderboard button clicked');
                     const modal = document.getElementById('leaderboard-modal');
                     const leaderboardList = document.getElementById('modal-leaderboard-list');
-                    console.log('Modal found:', modal);
-                    console.log('Leaderboard list found:', leaderboardList);
-                    
                     if (modal && leaderboardList) {
                         updateLeaderboardDisplay();
                         modal.style.display = 'block';
-                        console.log('Leaderboard modal displayed');
                     }
                 });
-                console.log('Leaderboard click handler attached');
             }
         }
 
-        // Initialize character selection with debug logging
         function initializeCharacterSelect() {
-            console.log('Initializing character select...');
-            console.log('Current character states:', Object.entries(characterTypes).map(([id, char]) => ({
-                id,
-                name: char.name,
-                unlocked: char.unlocked,
-                requirement: char.requirement
-            })));
-            
             const characterGrid = document.querySelector('.character-grid');
             if (!characterGrid) {
-                console.error('Character grid not found');
                 return;
             }
-
-            // Clear existing options
             characterGrid.innerHTML = '';
             
-            // Add character options
             Object.entries(characterTypes).forEach(([id, char]) => {
-                console.log(`Creating option for character ${id}:`, {
-                    unlocked: char.unlocked,
-                    selected: id === currentCharacter
-                });
-                
                 const option = document.createElement('div');
                 option.className = `character-option ${char.unlocked ? 'unlocked' : 'locked'} ${id === currentCharacter ? 'selected' : ''}`;
                 option.dataset.characterId = id;
                 
-                // Create preview element
                 const preview = document.createElement('div');
                 preview.className = 'character-preview';
                 preview.innerHTML = char.svg;
                 
-                // Create name element
                 const name = document.createElement('div');
                 name.className = 'character-name';
                 name.textContent = char.name;
                 
-                // Add elements to option
                 option.appendChild(preview);
                 option.appendChild(name);
                 
-                // Add lock icon and tooltip if character is locked
                 if (!char.unlocked) {
                     const lock = document.createElement('div');
                     lock.className = 'character-locked';
@@ -1863,61 +1751,54 @@
                     const tooltip = document.createElement('div');
                     tooltip.className = 'character-tooltip';
                     
-                    // Get achievement name for the requirement
                     let requirementText = 'Locked';
-                    if (char.requirement.startsWith('score_')) {
-                        const score = char.requirement.split('_')[1];
-                        requirementText = `Reach ${score} points to unlock`;
-                    } else if (char.requirement.startsWith('achievement_')) {
-                        const achievementCount = char.requirement.split('_')[1];
-                        requirementText = achievementCount === '5' ? 
-                            'Unlock ALL achievements to unlock' : 
-                            `Unlock ${achievementCount} achievements to unlock`;
+                    if (char.requirement) {
+                        if (char.requirement.startsWith('score_')) {
+                            const scoreReq = char.requirement.split('_')[1];
+                            requirementText = `Reach ${scoreReq} points to unlock`;
+                        } else if (char.requirement.startsWith('achievement_')) {
+                            const achievementCount = char.requirement.split('_')[1];
+                            requirementText = achievementCount === '5' ? 
+                                'Unlock ALL achievements to unlock' : 
+                                `Unlock ${achievementCount} achievements to unlock`;
+                        } else if (achievements[char.requirement]) {
+                             requirementText = `Unlock "${achievements[char.requirement].name}" achievement`;
+                        }
                     }
-                    
                     tooltip.textContent = requirementText;
                     option.appendChild(tooltip);
                 }
                 
-                // Add click handler for unlocked characters
                 if (char.unlocked) {
-                    console.log(`Adding click handler for unlocked character: ${id}`);
                     option.addEventListener('click', () => {
-                        console.log('Character option clicked:', id);
                         selectCharacter(id);
                     });
                 }
-                
                 characterGrid.appendChild(option);
             });
-            console.log('Character options added to grid');
         }
 
         function resetGameProgress() {
-            console.log('Resetting game progress...');
             try {
-                // Clear localStorage
                 localStorage.removeItem('dinoGameProgress');
-                
-                // Reset game state
                 currentCharacter = 'default';
                 score = 0;
+                highScore = 0;
                 leaderboard = [];
                 
-                // Reset achievements
                 Object.values(achievements).forEach(achievement => {
                     achievement.unlocked = false;
                 });
                 unlockedAchievements.clear();
                 
-                // Reset characters
                 Object.entries(characterTypes).forEach(([id, char]) => {
                     if (id !== 'default') {
                         char.unlocked = false;
+                    } else {
+                        char.unlocked = true; 
                     }
                 });
                 
-                // Reset UI
                 const dino = document.getElementById('dino');
                 if (dino) {
                     const defaultChar = characterTypes.default;
@@ -1925,31 +1806,24 @@
                     dino.style.backgroundImage = `url("${svgDataUrl}")`;
                 }
                 
-                // Reinitialize everything
                 initializeCharacterSelect();
                 initializeAchievements();
                 initializeLeaderboard();
                 updateStartButton();
+                updateHighScoreDisplay();
                 
-                console.log('Game progress reset complete');
-                
-                // Show title screen
                 titleScreen.style.display = 'block';
                 gameContainer.style.display = 'none';
                 
-                // Hide reset confirmation modal
                 const resetModal = document.getElementById('reset-confirm-modal');
                 if (resetModal) {
                     resetModal.style.display = 'none';
                 }
-                highScore = 0;
-                updateHighScoreDisplay();
             } catch (error) {
-                console.error('Error resetting game progress:', error);
+                // error resetting
             }
         }
 
-        // Initialize reset button
         function initializeResetButton() {
             const resetBtn = document.getElementById('reset-save-btn');
             const resetModal = document.getElementById('reset-confirm-modal');
@@ -1969,7 +1843,6 @@
                     resetModal.style.display = 'none';
                 });
                 
-                // Close modal when clicking outside
                 window.addEventListener('click', (event) => {
                     if (event.target === resetModal) {
                         resetModal.style.display = 'none';
@@ -1978,31 +1851,23 @@
             }
         }
 
-        // Update initializeGame to include all initializations
         function initializeGame() {
-            console.log('Initializing game...');
-            
-            // Load saved progress first
             loadGameProgress();
-            
-            // Initialize all features
             initializeAchievements();
             initializeLeaderboard();
             initializeCharacterSelect();
             initializeResetButton();
+            updateStartButton(); 
             
-            // Initialize start button click handler
             const startGameBtn = document.getElementById('start-game');
             if (startGameBtn) {
                 startGameBtn.addEventListener('click', function() {
                     if (currentCharacter) {
-                        console.log('Starting game with character:', currentCharacter);
                         startGame();
                     }
                 });
             }
             
-            // Initialize modal close buttons
             document.querySelectorAll('.modal-close').forEach(closeBtn => {
                 closeBtn.addEventListener('click', function() {
                     const modal = this.closest('.modal');
@@ -2012,7 +1877,6 @@
                 });
             });
             
-            // Add click-outside-to-close for modals
             window.addEventListener('click', (event) => {
                 if (event.target.classList.contains('modal')) {
                     event.target.style.display = 'none';
@@ -2023,34 +1887,7 @@
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initializeGame);
         } else {
-            setTimeout(initializeGame, 0);
-        }
-
-        // function unlockCharacter(characterId) {
-        //    console.log('Attempting to unlock character:', characterId);
-        //    if (!character) {
-        //    const character = characters.find(c => c.id === characterId);
-        //        console.error('Character not found:', characterId);
-        //        return;
-        //    }
-
-            if (!character.unlocked) {
-                console.log('Unlocking character:', character.name);
-                character.unlocked = true;
-                saveGameProgress();
-                updateCharacterSelect();
-
-                const popup = document.getElementById('character-unlock-popup');
-                const icon = popup.querySelector('.character-icon');
-                const nameElement = popup.querySelector('.character-name');
-                icon.style.backgroundImage = `url('${character.image}')`;
-                nameElement.textContent = character.name;
-                popup.classList.add('show');
-
-                setTimeout(() => {
-                    popup.classList.remove('show');
-                }, 3000);
-            }
+            initializeGame();
         }
 
         (function() {
@@ -2059,7 +1896,7 @@
             const nightLayer = document.querySelector('.bg-night');
             let clouds = [];
             let isNight = false;
-            let lastDayNightScore = 0;
+            
             function createClouds() {
                 cloudsLayer.innerHTML = '';
                 clouds = [];
@@ -2081,7 +1918,7 @@
                 });
                 requestAnimationFrame(animateBackground);
             }
-            function updateDayNightCycle(currentScore) {
+            function updateDayNightCycleFn(currentScore) {
                 const cycle = Math.floor(currentScore / 500) % 2;
                 if (cycle !== (isNight ? 1 : 0)) {
                     isNight = !isNight;
@@ -2098,7 +1935,7 @@
                     sky.style.setProperty('--ground-color', ground);
                 }
             }
-            window.updateDayNightCycle = updateDayNightCycle;
+            window.updateDayNightCycle = updateDayNightCycleFn;
             createClouds();
             animateBackground();
             let sky1 = '#87ceeb', sky2 = '#87ceeb', ground = '#deb887';
